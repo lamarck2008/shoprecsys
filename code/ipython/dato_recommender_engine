@@ -1,0 +1,735 @@
+{
+ "metadata": {
+  "name": "",
+  "signature": "sha256:cb50fb8515185fac46c7c1eac82b19e583af30ee67bc726d1707349ca1b832cd"
+ },
+ "nbformat": 3,
+ "nbformat_minor": 0,
+ "worksheets": [
+  {
+   "cells": [
+    {
+     "cell_type": "code",
+     "collapsed": false,
+     "input": [
+      "# This reccommender system is based on Dato\n",
+      "\n",
+      "import numpy as np\n",
+      "import pandas as pd\n",
+      "\n",
+      "import graphlab as gl\n",
+      "\n",
+      "import os\n",
+      "current_dir = os.getcwd()\n",
+      "data_dir = os.path.join(current_dir, 'data')\n",
+      "if not os.path.exists(data_dir):\n",
+      "    os.mkdir(data_dir)\n",
+      "\n",
+      "from datetime import datetime\n",
+      "shoptiques_data_file = \"user_product_order_{0.month}_{0.day}_{0.year}.dat\".format(datetime.now())"
+     ],
+     "language": "python",
+     "metadata": {},
+     "outputs": [],
+     "prompt_number": 1
+    },
+    {
+     "cell_type": "code",
+     "collapsed": false,
+     "input": [
+      "# load data and convert to SFrame\n",
+      "order_df = pd.read_csv(\"/Users/yantan/Documents/Insight Data Program/Project/Shoptiques/shoprecsys/code/ipython/data/user_product_order.dat\",\\\n",
+      "                       header=None, names=[\"user\", \"product\", \"order\"])\n",
+      "order_sf = gl.SFrame(order_df)\n",
+      "order_sf.head()"
+     ],
+     "language": "python",
+     "metadata": {},
+     "outputs": [
+      {
+       "html": [
+        "<div style=\"max-height:1000px;max-width:1500px;overflow:auto;\"><table frame=\"box\" rules=\"cols\">\n",
+        "    <tr>\n",
+        "        <th style=\"padding-left: 1em; padding-right: 1em; text-align: center\">user</th>\n",
+        "        <th style=\"padding-left: 1em; padding-right: 1em; text-align: center\">product</th>\n",
+        "        <th style=\"padding-left: 1em; padding-right: 1em; text-align: center\">order</th>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">482</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">1</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">1719</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">1</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">3</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">1723</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">26</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">639</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">1</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">26</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2493</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">1</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">56</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">1921</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">1</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">66</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2511</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">1</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">68</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2695</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">1</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">68</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2697</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">1</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">68</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2701</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">1</td>\n",
+        "    </tr>\n",
+        "</table>\n",
+        "[10 rows x 3 columns]<br/>\n",
+        "</div>"
+       ],
+       "metadata": {},
+       "output_type": "pyout",
+       "prompt_number": 4,
+       "text": [
+        "Columns:\n",
+        "\tuser\tint\n",
+        "\tproduct\tint\n",
+        "\torder\tint\n",
+        "\n",
+        "Rows: 10\n",
+        "\n",
+        "Data:\n",
+        "+------+---------+-------+\n",
+        "| user | product | order |\n",
+        "+------+---------+-------+\n",
+        "|  2   |   482   |   1   |\n",
+        "|  2   |   1719  |   1   |\n",
+        "|  3   |   1723  |   2   |\n",
+        "|  26  |   639   |   1   |\n",
+        "|  26  |   2493  |   1   |\n",
+        "|  56  |   1921  |   1   |\n",
+        "|  66  |   2511  |   1   |\n",
+        "|  68  |   2695  |   1   |\n",
+        "|  68  |   2697  |   1   |\n",
+        "|  68  |   2701  |   1   |\n",
+        "+------+---------+-------+\n",
+        "[10 rows x 3 columns]"
+       ]
+      }
+     ],
+     "prompt_number": 4
+    },
+    {
+     "cell_type": "code",
+     "collapsed": false,
+     "input": [
+      "# construct model based on matrix factorization\n",
+      "mf_model = gl.recommender.factorization_recommender.create(order_sf, user_id=\"user\", item_id=\"product\", target=\"order\")"
+     ],
+     "language": "python",
+     "metadata": {},
+     "outputs": [
+      {
+       "html": [
+        "<pre>PROGRESS: Recsys training: model = factorization_recommender</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: Recsys training: model = factorization_recommender"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: Preparing data set.</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: Preparing data set."
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS:     Data has 33837 observations with 17578 users and 17362 items.</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS:     Data has 33837 observations with 17578 users and 17362 items."
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS:     Data prepared in: 0.088098s</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS:     Data prepared in: 0.088098s"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: Training factorization_recommender for recommendations.</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: Training factorization_recommender for recommendations."
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: +--------------------------------+--------------------------------------------------+----------+</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: +--------------------------------+--------------------------------------------------+----------+"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | Parameter                      | Description                                      | Value    |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | Parameter                      | Description                                      | Value    |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: +--------------------------------+--------------------------------------------------+----------+</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: +--------------------------------+--------------------------------------------------+----------+"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | num_factors                    | Factor Dimension                                 | 8        |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | num_factors                    | Factor Dimension                                 | 8        |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | regularization                 | L2 Regularization on Factors                     | 1e-06    |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | regularization                 | L2 Regularization on Factors                     | 1e-06    |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | solver                         | Solver used for training                         | auto     |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | solver                         | Solver used for training                         | auto     |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | max_iterations                 | Maximum Number of Iterations                     | 50       |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | max_iterations                 | Maximum Number of Iterations                     | 50       |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: +--------------------------------+--------------------------------------------------+----------+</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: +--------------------------------+--------------------------------------------------+----------+"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS:   Optimizing model using SGD; tuning step size.</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS:   Optimizing model using SGD; tuning step size."
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS:   Using 10000 / 33837 points for tuning the step size.</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS:   Using 10000 / 33837 points for tuning the step size."
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: +---------+-------------------+---------------------------+</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: +---------+-------------------+---------------------------+"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | Attempt | Initial Step Size | Estimated Objective Value |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | Attempt | Initial Step Size | Estimated Objective Value |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: +---------+-------------------+---------------------------+</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: +---------+-------------------+---------------------------+"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | 0       | 25                | Not Viable                |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | 0       | 25                | Not Viable                |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | 1       | 6.25              | Not Viable                |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | 1       | 6.25              | Not Viable                |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | 2       | 1.5625            | Not Viable                |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | 2       | 1.5625            | Not Viable                |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | 3       | 0.390625          | 0.0214773                 |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | 3       | 0.390625          | 0.0214773                 |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | 4       | 0.195312          | 0.014762                  |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | 4       | 0.195312          | 0.014762                  |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | 5       | 0.0976562         | 0.0286401                 |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | 5       | 0.0976562         | 0.0286401                 |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | 6       | 0.0488281         | 0.0476223                 |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | 6       | 0.0488281         | 0.0476223                 |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: +---------+-------------------+---------------------------+</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: +---------+-------------------+---------------------------+"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | Final   | 0.195312          | 0.014762                  |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | Final   | 0.195312          | 0.014762                  |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: +---------+-------------------+---------------------------+</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: +---------+-------------------+---------------------------+"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: Starting Optimization.</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: Starting Optimization."
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: +---------+--------------+-------------------+-----------------------+-------------+</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: +---------+--------------+-------------------+-----------------------+-------------+"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | Iter.   | Elapsed Time | Approx. Objective | Approx. Training RMSE | Step Size   |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | Iter.   | Elapsed Time | Approx. Objective | Approx. Training RMSE | Step Size   |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: +---------+--------------+-------------------+-----------------------+-------------+</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: +---------+--------------+-------------------+-----------------------+-------------+"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | Initial | 322us        | 0.0976942         | 0.312561              |             |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | Initial | 322us        | 0.0976942         | 0.312561              |             |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: +---------+--------------+-------------------+-----------------------+-------------+</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: +---------+--------------+-------------------+-----------------------+-------------+"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | 1       | 7.772ms      | 0.142046          | 0.376888              | 0.195312    |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | 1       | 7.772ms      | 0.142046          | 0.376888              | 0.195312    |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | 2       | 16.749ms     | 0.0591709         | 0.243243              | 0.116134    |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | 2       | 16.749ms     | 0.0591709         | 0.243243              | 0.116134    |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | 3       | 30.672ms     | 0.0367259         | 0.191622              | 0.0856819   |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | 3       | 30.672ms     | 0.0367259         | 0.191622              | 0.0856819   |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | 4       | 38.671ms     | 0.0277611         | 0.166578              | 0.0580668   |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | 4       | 38.671ms     | 0.0277611         | 0.166578              | 0.0580668   |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | 5       | 44.419ms     | 0.0234032         | 0.152913              | 0.0491185   |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | 5       | 44.419ms     | 0.0234032         | 0.152913              | 0.0491185   |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | 6       | 58.663ms     | 0.0205482         | 0.143247              | 0.042841    |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | 6       | 58.663ms     | 0.0205482         | 0.143247              | 0.042841    |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | 11      | 111.515ms    | 0.0138557         | 0.117495              | 0.0271912   |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | 11      | 111.515ms    | 0.0138557         | 0.117495              | 0.0271912   |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: +---------+--------------+-------------------+-----------------------+-------------+</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: +---------+--------------+-------------------+-----------------------+-------------+"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: | Final   | 437.799ms    | 0.00684203        | 0.0820598             |             |</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: | Final   | 437.799ms    | 0.00684203        | 0.0820598             |             |"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: +---------+--------------+-------------------+-----------------------+-------------+</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: +---------+--------------+-------------------+-----------------------+-------------+"
+       ]
+      },
+      {
+       "html": [
+        "<pre>PROGRESS: Optimization Complete: Maximum number of passes through the data reached.</pre>"
+       ],
+       "metadata": {},
+       "output_type": "display_data",
+       "text": [
+        "PROGRESS: Optimization Complete: Maximum number of passes through the data reached."
+       ]
+      }
+     ],
+     "prompt_number": 6
+    },
+    {
+     "cell_type": "code",
+     "collapsed": false,
+     "input": [
+      "mf_model.recommend(np.array([2]))"
+     ],
+     "language": "python",
+     "metadata": {},
+     "outputs": [
+      {
+       "html": [
+        "<div style=\"max-height:1000px;max-width:1500px;overflow:auto;\"><table frame=\"box\" rules=\"cols\">\n",
+        "    <tr>\n",
+        "        <th style=\"padding-left: 1em; padding-right: 1em; text-align: center\">user</th>\n",
+        "        <th style=\"padding-left: 1em; padding-right: 1em; text-align: center\">product</th>\n",
+        "        <th style=\"padding-left: 1em; padding-right: 1em; text-align: center\">score</th>\n",
+        "        <th style=\"padding-left: 1em; padding-right: 1em; text-align: center\">rank</th>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">67321</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">13.2548953279</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">1</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">5490</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">8.01923417853</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">53576</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">7.23444460035</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">3</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">44717</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">4.95789260703</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">4</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">14187</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">4.35721862926</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">5</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">38342</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">4.28291588351</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">6</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">60527</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">3.77099483944</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">7</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">64388</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">3.52618568062</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">8</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">49815</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">3.25938689156</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">9</td>\n",
+        "    </tr>\n",
+        "    <tr>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">33353</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">2.82305985758</td>\n",
+        "        <td style=\"padding-left: 1em; padding-right: 1em; text-align: center; vertical-align: top\">10</td>\n",
+        "    </tr>\n",
+        "</table>\n",
+        "[10 rows x 4 columns]<br/>\n",
+        "</div>"
+       ],
+       "metadata": {},
+       "output_type": "pyout",
+       "prompt_number": 7,
+       "text": [
+        "Columns:\n",
+        "\tuser\tint\n",
+        "\tproduct\tint\n",
+        "\tscore\tfloat\n",
+        "\trank\tint\n",
+        "\n",
+        "Rows: 10\n",
+        "\n",
+        "Data:\n",
+        "+------+---------+---------------+------+\n",
+        "| user | product |     score     | rank |\n",
+        "+------+---------+---------------+------+\n",
+        "|  2   |  67321  | 13.2548953279 |  1   |\n",
+        "|  2   |   5490  | 8.01923417853 |  2   |\n",
+        "|  2   |  53576  | 7.23444460035 |  3   |\n",
+        "|  2   |  44717  | 4.95789260703 |  4   |\n",
+        "|  2   |  14187  | 4.35721862926 |  5   |\n",
+        "|  2   |  38342  | 4.28291588351 |  6   |\n",
+        "|  2   |  60527  | 3.77099483944 |  7   |\n",
+        "|  2   |  64388  | 3.52618568062 |  8   |\n",
+        "|  2   |  49815  | 3.25938689156 |  9   |\n",
+        "|  2   |  33353  | 2.82305985758 |  10  |\n",
+        "+------+---------+---------------+------+\n",
+        "[10 rows x 4 columns]"
+       ]
+      }
+     ],
+     "prompt_number": 7
+    },
+    {
+     "cell_type": "code",
+     "collapsed": false,
+     "input": [
+      "# use ite"
+     ],
+     "language": "python",
+     "metadata": {},
+     "outputs": []
+    }
+   ],
+   "metadata": {}
+  }
+ ]
+}
